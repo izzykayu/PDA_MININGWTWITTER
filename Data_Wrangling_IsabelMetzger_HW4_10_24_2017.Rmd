@@ -1,0 +1,517 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Isabel Metzger
+Homework 4_4
+Data Wrangling
+
+```{r}
+library(readr)
+stategrid <- read_delim("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/state-grid-coordinates.tsv", 
+    "\t", escape_double = FALSE, trim_ws = TRUE)
+ACS_14_5YR_DP02_ <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/ACS_14_5YR_DP02_.zip", 
+    skip = 1)
+
+```
+
+```{r useful functions}
+library(tidyverse)
+trim <- function (x) gsub("^\\s+|\\s+$", "", x)   # function to trim spaces of columns
+multi.fun <- function(x) {cbind(freq = table(x), percentage = prop.table(table(x))*100)}  
+```
+
+```{r}
+library(data.table)
+library(readr)
+stategrid <- read_delim("state-grid-coordinates.tsv", 
+    "\t", escape_double = FALSE, trim_ws = TRUE)
+# loading various df
+#gov datasets
+opioids_name_list <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/opioids.csv")
+OD_Multiple_Cause_of_Death_1999_2014_v1_1 <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/Multiple Cause of Death, 1999-2014 v1.1.csv")
+Opioid_analgesic_prescriptions_dispensed_from_US_retail_pharmacies_Q4_2009_Q2_2015 <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/Opioid analgesic prescriptions dispensed from US retail pharmacies, Q4 2009-Q2 2015.csv")
+ACS_14_5YR_B07012_PovertyState <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/ACS_14_5YR_B07012_PovertyState.zip", 
+    skip = 1)
+ACS_13_5YR_B07012_Poverty <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/ACS_13_5YR_B07012_Poverty.zip", 
+    skip = 1)
+OD <- read.csv('overdoses_2014.csv')
+```
+```{r reading Part_D_Opioid_Prescribing_Geographic}
+library(readxl)
+Part_D_Opioid_Prescribing_Change_Geographic_2013_2014 <- read_excel("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/Part_D_Opioid_Prescribing_Change_Geographic_2013_2014.xlsx", 
+    skip = 2)
+```
+```{r head PartD}
+str(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014)
+```
+```{r loading tidyr and dplyr}
+library(tidyr)
+library(dplyr)
+```
+
+```{r as tibble OpioidPrescribing Geographic}
+library(tidyverse)
+OpioidPrescribingTibble13.14 <- as_tibble(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014)
+```
+```{r}
+setnames(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014, "State Name", "State")
+```
+```{r printing Opioid Claims 2013}
+OpioidPrescribingTibble13.14 %>% .[["Opioid Claims 2013"]]
+```
+```{r converting opioid geographic to table_df}
+x <- type_convert(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014)  # table_df
+```
+
+```{r loading census data}
+library(readr)
+PEP_2016_PEPANNRES <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/PEP_2016_PEPANNRES.zip", 
+    skip = 1)
+```
+```{r head census}
+head(PEP_2016_PEPANNRES, 3)
+```
+```{r CENSUS only regions and US}
+fullUS_NE_MW_SOUTH_WEST <- PEP_2016_PEPANNRES[PEP_2016_PEPANNRES$Id == '0100000US' | PEP_2016_PEPANNRES$Id == '0200000US1' | PEP_2016_PEPANNRES$Id == '0200000US2' |  PEP_2016_PEPANNRES$Id == '0200000US3' | PEP_2016_PEPANNRES$Id == '0200000US4' ,]
+```
+```{r made df of only regions}
+fullUS_NE_MW_SOUTH_WEST
+```
+```{r printing out col names of census }
+colnames(PEP_2016_PEPANNRES)
+```
+```{r limiting data to only these col nams}
+select.group <- c("Id", "Geography","Population Estimate (as of July 1) - 2013","Population Estimate (as of July 1) - 2014")
+CENSUS_13.14 <- select(PEP_2016_PEPANNRES, select.group)
+```
+```{r}
+head(CENSUS_13.14, 3)
+```
+```{r loading prescriber info from 2014}
+prescriber_info <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/prescriber-info.csv")
+```
+```{r}
+Opioid.PrescribersDF <- prescriber_info[prescriber_info$Opioid.Prescriber == 1,]
+```
+```{r}
+head(Opioid.PrescribersDF)
+```
+
+```{r}
+dim(Opioid.PrescribersDF)
+```
+
+```{r}
+VSRR_Provisional_Drug_Overdose_Death_Counts<-read.csv('VSRR_Provisional_Drug_Overdose_Death_Counts.csv')
+VSRR_Quarterly_provisional_estimates_for_selected_indicators_of_mortality <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/VSRR_-_Quarterly_provisional_estimates_for_selected_indicators_of_mortality.csv")
+```
+```{r}
+str(VSRR_Provisional_Drug_Overdose_Death_Counts)
+```
+```{r}
+tail(VSRR_Quarterly_provisional_estimates_for_selected_indicators_of_mortality)
+# head(VSR13.14.drugoverdosedeaths)
+```
+```{r}
+parallel <- select(VSRR_Quarterly_provisional_estimates_for_selected_indicators_of_mortality, c("Year and Quarter", "Indicator", "Rate Type", "Rate"))
+```
+
+```{r}
+# library(lattice)
+# parallelplot(sepopioidRX[c("2015 Q1","2017 Q1"),], horizontal.axis=FALSE)
+
+```
+
+```{r}
+Allcauses_Drugoverdose_indicators_estimates <- VSRR_Quarterly_provisional_estimates_for_selected_indicators_of_mortality[VSRR_Quarterly_provisional_estimates_for_selected_indicators_of_mortality$Indicator=='All Causes' | VSRR_Quarterly_provisional_estimates_for_selected_indicators_of_mortality$Indicator=='Drug overdose',]
+```
+
+```{r}
+Allcauses_Drugoverdose_indicators_estimates<- Allcauses_Drugoverdose_indicators_estimates %>%
+  separate(`Year and Quarter`, into=c("Year", "Q"), sep=" ")
+Allcauses_Drugoverdose_indicators_estimates$Year <- as.numeric(Allcauses_Drugoverdose_indicators_estimates$Year)
+```
+```{r}
+Allcauses_Drugoverdose_indicators_estimates <- Allcauses_Drugoverdose_indicators_estimates[Allcauses_Drugoverdose_indicators_estimates$`Rate Type`=='Age-adjusted',]
+```
+
+
+```{r}
+ODdeaths_13.14 <- OD_Multiple_Cause_of_Death_1999_2014_v1_1[OD_Multiple_Cause_of_Death_1999_2014_v1_1$Year==2013 | OD_Multiple_Cause_of_Death_1999_2014_v1_1$Year==2014,]
+```
+```{r}
+head(ODdeaths_13.14)
+```
+
+```{r}
+# colnames(ACS_13_5YR_B07012_Poverty)
+colkeep.pov <- c("Geography","Estimate; Total:","Estimate; Total: - Below 100 percent of the poverty level","Estimate; Total: - 100 to 149 percent of the poverty level","Estimate; Total: - At or above 150 percent of the poverty level")
+ACS_Poverty_Estimates13 <- select(ACS_13_5YR_B07012_Poverty, colkeep.pov)
+```
+```{r}
+ACS14_Poverty <- select(ACS_14_5YR_B07012_PovertyState, colkeep.pov)
+```
+
+```{r}
+list1 <- 1:51
+list13 <- rep(2013,length(list1))
+list14 <- rep(2014,length(list1))
+ACS_Poverty_Estimates13$Year <- c(list13)
+ACS14_Poverty$Year <- c(list14)
+```
+```{r}
+head(ACS_Poverty_Estimates13, 2)
+head(ACS14_Poverty)
+```
+```{r}
+total13.14.Poverty <- rbind(ACS_Poverty_Estimates13, ACS14_Poverty)
+```
+```{r}
+colnames(total13.14.Poverty) <- c("State", "Total Poverty", "Below 100 percent of the poverty level", "100 to 149 percent of the poverty level", "At or above 150 percent of the poverty level", "Year")
+total13.14.Poverty <- total13.14.Poverty[order(total13.14.Poverty$State),]
+tail(total13.14.Poverty)
+```
+```{r}
+dim(total13.14.Poverty)
+```
+```{r}
+Poverty.ODeaths.13.15 <- merge(total13.14.Poverty, ODdeaths_13.14, by=c("State","Year"))
+```
+```{r}
+head(Poverty.ODeaths.13.15, 2)
+```
+```{r}
+setnames(Poverty.ODeaths.13.15, "Crude Rate", "Crude Rate Deaths")
+```
+
+```{r}
+colnames(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014)
+```
+```{r}
+library(lattice)
+parallelplot(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014[, c("Opioid Prescribing Rate 2013","Opioid Prescribing Rate 2014")], horizontal.axis=FALSE)
+
+```
+
+
+```{r}
+PartD.Opioid.13 <- select(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014, c("State", "State Abbreviation", "Part D Prescribers 2013","Opioid Claims 2013", "Overall Claims 2013", "Opioid Prescribing Rate 2013"))
+# list1 <- 1:51
+# list13 <- rep(2013,length(list1))
+# list14 <- rep(2014,length(list1))
+PartD.Opioid.13$Year <- c(list13)
+PartD.Opioid.14 <- select(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014, c("State", "State Abbreviation", "Part D Prescribers 2014","Opioid Claims 2014", "Overall Claims 2014", "Opioid Prescribing Rate 2014"))
+```
+```{r}
+PartD.Opioid.14$Year <- c(list14)
+new.names.partD <- c("State", "Abbrev", "Part D Prescribers", "Opioid Claims", "Overall Claims", "Opioid Prescribing Rate", "Year")
+colnames(PartD.Opioid.13) <- new.names.partD
+colnames(PartD.Opioid.14) <- new.names.partD
+
+```
+```{r}
+total13.14.Prescribers <- rbind(PartD.Opioid.13, PartD.Opioid.14)
+```
+
+```{r}
+Poverty.ODeaths.Prescribers.13.14 <- merge(total13.14.Prescribers, Poverty.ODeaths.13.15, by=c("State","Year"))
+```
+```{r}
+head(Poverty.ODeaths.Prescribers.13.14)
+```
+
+```{r}
+colnames(Poverty.ODeaths.Prescribers.13.14)
+```
+```{r}
+Poverty.ODeaths.Prescribers.13.14$Opioid.Overall <- (Poverty.ODeaths.Prescribers.13.14$`Opioid Claims`/Poverty.ODeaths.Prescribers.13.14$`Overall Claims`)
+```
+```{r}
+Poverty.ODeaths.Prescribers.13.14$Ratio.Prescribers.Popln <- round(100000*(Poverty.ODeaths.Prescribers.13.14$`Part D Prescribers`/Poverty.ODeaths.Prescribers.13.14$Population))  # per 100000 people
+```
+```{r}
+head(Poverty.ODeaths.Prescribers.13.14)
+```
+
+```{r}
+opioidanalgesicRXtibble <- as_tibble(Opioid_analgesic_prescriptions_dispensed_from_US_retail_pharmacies_Q4_2009_Q2_2015)
+```
+```{r}
+head(opioidanalgesicRXtibble, 4)
+```
+```{r}
+sepopioidRX <- opioidanalgesicRXtibble %>%
+  separate(Quarter, into=c("Q", "Year"), sep=" ")
+```
+```{r}
+sepopioidRX$Year <- as.numeric(sepopioidRX$Year)
+```
+```{r}
+head(sepopioidRX, 2)
+```
+```{r}
+sepopioidRX$Num <- c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23)
+```
+```{r}
+sepopioidRX <-as.data.frame(sepopioidRX)
+```
+```{r}
+sepopioidRX
+```
+
+
+```{r}
+library(ggthemes)
+library(ggplot2)
+
+```
+```{r}
+
+drug_columns <- c("Fentanyl", "Morphine", "Tramadol", "Oxycodone", "Hydrocodone", "H+O+T+M+F", "All Opioid Analgesics","ER/LA Opioid Analgesics")
+cl <- rainbow(8)
+# max_deaths <-max(sepopioidRX[,drug_columns])
+par(mfrow=c(2,2))
+for (i in 1:length(drug_columns)) {
+  hist(as.numeric(sepopioidRX[,drug_columns[i]]), col="darkorchid3", main=drug_columns[i],cex.main=0.8, cex.axis=0.7, border="white", xlab = " ")
+}
+
+```
+```{r}
+par(mfrow=c(2,2))
+# Small multiples, lines
+for (i in 1:length(drug_columns)) {
+  plot(sepopioidRX$Num, sepopioidRX[,drug_columns[i]], type="l", main=drug_columns[i], xlab="Q42009-Q2-2015", ylab="Rx", col="purple", axes = FALSE)
+ axis(1, labels = FALSE)
+ axis(side=2, labels=TRUE)
+}
+```
+```{r}
+library(nlme)
+```
+
+```{r}
+library(plotrix)
+par(mfrow=c(2,2))
+for (i in 1:length(drug_columns)) {
+  stackpoly(as.numeric(sepopioidRX[,drug_columns[i]], col=cl[i]), col="darkorchid3", main=drug_columns[i],cex.main=0.8, border="white")
+}
+```
+```{r}
+library(nlme)
+par(mfrow=c(3,1))
+for (i in 1:length(drug_columns)) {
+ stripchart(sepopioidRX[,drug_columns[i]], main=drug_columns[i], pch='o', col="darkorchid", cex=3, xlab = "Rx")
+}
+```
+```{r}
+par(mfrow=c(1,2))
+for (i in 1:length(drug_columns)) {
+ boxplot(sepopioidRX[,drug_columns[i]], main=drug_columns[i], pch='o', col="cyan", cex=1.3, xlab="Rx")
+}
+```
+
+```{r}
+sepopioidRXn <- sepopioidRX[sepopioidRX$Year!=2009,]
+sepopioidRXn <- sepopioidRXn[sepopioidRXn$Year!=2015,]
+p <- ggplot(sepopioidRXn, aes(x=Year)) + theme_solarized_2()
+p + labs(title="Total opioid analgesic prescriptions per year from retail pharmacies") + geom_point(aes(y=`Yearly totals (All Opioid Analgesics)`),size=4, pch=21, col="blue")
+```
+```{r}
+p + geom_point(aes(y=`Yearly totals (H+O+T+M+F)`),size=4,pch=21,col="orange")
+```
+
+Large decrease in opioid analgesic Part D claims from 2012 to 2013.
+
+```{r}
+# p <- ggplot(sepopioidRX, aes(x=Year, y=`All Opioid Analgesics`, group=Year)) + geom_point(size=3, col="black") + geom_rect(data = sepopioidRX, aes(fill = Year, xmin = -Inf, xmax = Inf,
+#             ymin = -Inf,ymax = Inf), alpha = 0.25) + labs(title="All Opioid Analgesics per Year (Part D)")
+# 
+# p + facet_grid(. ~Year, scales="fixed") + theme_dark() + scale_color_wsj("colors6", "") + theme(legend.position = "none")
+```
+What about opoid dispensing from retail pharmacies?
+```{r}
+opioid_prescriptions_dispensed_us_1991_2013 <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/opioid-prescriptions-dispensed-us-1991-2013.csv")
+```
+
+```{r}
+ggplot(opioid_prescriptions_dispensed_us_1991_2013, aes(Year, `Prescriptions Dispensed (millions)`)) + geom_point(aes(col=as.character(Year))) + theme_solarized_2()
+```
+Part D only contains information for those age 65+. This is why I want to look directly at individual prescriber patterns.
+```{r fig.height = 6, fig.width = 10, fig.align = "center"}
+ggplot(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014) + geom_histogram(aes(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Opioid Prescribing Rate 2014`, fill=State))
+```
+
+```{r}
+Pharmacies <- read_csv("~/R_STUDIO_FALL_2017_PDA/hw2-izzykayu/PDA_project_tweets_machinelearning_IM_MG/geolocation.mappingpharmacies.hospitals.services.etc/Pharmacies.csv")
+```
+```{r}
+rx_columns <- c("Fentanyl", "Tramadol", "Oxycodone", "Morphine", "H+O+T+M+F", "All Opioid Analgesics", "ER/LA Opioid Analgesics", "Yearly totals (All Opioid Analgesics")
+# max_deaths <-max(DrugAppearances_Yr_DF[,drug_columns])
+# plot(DrugAppearances_Yr_DF$Year, DrugAppearances_Yr_DF$Fentanyl, type="n", ylim=c(0, max_deaths))
+# for (i in 1:length(drug_columns)) {
+#   lines(DrugAppearances_Yr_DF$Year, DrugAppearances_Yr_DF[,drug_columns[i]])
+# }
+PharmacyStateCounts <- as.data.frame(multi.fun(Pharmacies$STATE))
+```
+```{r}
+PharmacyStateCounts <- setDT(PharmacyStateCounts, keep.rownames = TRUE)
+```
+```{r}
+# colSums(Filter(is.numeric, people)) makes df of all sums
+head(PharmacyStateCounts)
+```
+```{r}
+library(ggthemes)
+# A histogram of bill sizes
+columns=c("Crude Rate Deaths", "Opioid Prescribing Rate")
+
+for (i in 1:length(columns)) {
+ggplot(data=Poverty.ODeaths.Prescribers.13.14) + geom_histogram(aes(as.numeric(Poverty.ODeaths.Prescribers.13.14[,columns[i]],fill=Abbrev)), col="purple", alpha=0.2) + facet_grid(as.character(Year)~.)
+}
+# Histogram of crude rate deaths, divided by year, colored by state
+
+hp <- ggplot(Poverty.ODeaths.Prescribers.13.14, aes(x=as.numeric(`Crude Rate Deaths`))) + geom_histogram(aes(fill=Abbrev), alpha=0.2, col="blue") + theme(legend.position = "left") + theme_light() + facet_grid(as.character(Year)~.)  + labs(x="Overdose Death Rate per 100,000 ppl", title="Distribution 2013 vs 2014")
+
+hp
+```
+```{r}
+ ggplot(Poverty.ODeaths.Prescribers.13.14, aes(x=as.numeric(`Opioid Prescribing Rate`))) + geom_histogram(aes(fill=Abbrev), alpha=0.2, col="green") + theme(legend.position = "left") + labs(x="Opioid Prescribing Rate", title="Distribution 2013 vs 2014") + theme_bw() + facet_grid(as.character(Year)~.)
+
+```
+```{r}
+ ggplot(Poverty.ODeaths.Prescribers.13.14, aes(x=as.numeric(Ratio.Prescribers.Popln))) + geom_histogram(aes(fill=Abbrev), alpha=0.2, col="purple") + theme(legend.position = "left") + labs(x="Ratio.Prescribers.Popln", title="Distribution 2013 vs 2014") + theme_bw() + facet_grid(as.character(Year)~.)
+datax <- Poverty.ODeaths.Prescribers.13.14
+```
+```{r}
+OD$Population <- c(4833722,735132,6626624,2959373,38332521,5268367,3596080,925749,19552860,9992167,1404054,1612136,12882135, 6570902,3090416,2893957,4395295,4625470,1328302,5928814,6692824,9895622,5420380,2991207,6044171,1015165,1868516,2790136,1323459,  8899339,2085287,19651127,9848060,723393,11570808,3850568,3930065,12773801,1051511,4774839,844877,6495978,26448193,2900872,  626630,8260405,6971406,1854304,5742713,582658)  # changing to numeric values
+OD$Deaths <- c(723, 124, 1211, 356, 4521, 899, 623, 189, 2634, 1206, 157, 212, 1705, 1172, 264, 332, 1077, 777, 216, 1070, 1289, 1762, 517, 336, 1067, 125, 125, 545, 334, 1253, 547, 2300, 1358, 43, 2744, 777, 522, 2732, 247, 701, 63, 1269, 2601, 603, 83, 980, 979, 62, 853, 109)
+```
+
+```{r}
+head(PharmacyStateCounts,2)
+```
+
+```{r}
+PharmacyStateCounts$per100 <- round(100*as.numeric(PharmacyStateCounts$freq)/as.numeric(PharmacyStateCounts$Population))
+```
+```{r}
+PharmacyStateCounts <- PharmacyStateCounts[order(PharmacyStateCounts$freq),]
+```
+
+```{r fig.height = 6, fig.width = 10, fig.align = "center"}
+dotchart(PharmacyStateCounts$freq, labels=PharmacyStateCounts$rn, cex=.6, main="Pharmacies per State",
+xlab="Pharmacy Raw Counts", pch=19, col=c("darkblue","blue"), lcolor = "lightgrey",cex.main=2, cex.lab=1.2)
+```
+
+```{r}
+OD$DR <- round(100000*OD$Deaths/OD$Population)
+OD <- OD[order(OD$DR),]
+```
+
+```{r fig.height = 6, fig.width = 10, fig.align = "center"}
+dotchart(OD$DR, labels=OD$State, cex=.6, main="Overdose Deaths per State, 2014",
+xlab="Overdose Death Rates per 100,000 people", pch=19, col=c("darkblue","blue"), lcolor = "lightgrey",cex.main=2, cex.lab=1.2)
+
+```
+```{r}
+Poverty.ODeaths.Prescribers.13.14$BelowpovRate <- round(100000*Poverty.ODeaths.Prescribers.13.14$`Below 100 percent of the poverty level`/Poverty.ODeaths.Prescribers.13.14$Population)
+Poverty.ODeaths.Prescribers.14 <- Poverty.ODeaths.Prescribers.13.14[Poverty.ODeaths.Prescribers.13.14$Year==2014,]
+
+```
+```{r}
+# install.packages("car")
+```
+```{r}
+library(ggplot2)
+ggplot(Poverty.ODeaths.Prescribers.13.14, aes(BelowpovRate, `Crude Rate Deaths`, col=State, shape=as.character(Year))) + geom_point() + coord_flip() + theme(legend.position='none',  axis.text.x=element_blank()) + geom_rug() + labs(title="Overdose Death Rate and Below Poverty Rate",y="Overdose Death Rates per 100,000 ppl",x="Rate Below Poverty line per 100,000 ppl")
+```
+```{r}
+library(car)
+```
+
+```{r fig.height = 6, fig.width = 10, fig.align = "center"}
+attach(Poverty.ODeaths.Prescribers.13.14)
+sp(`Part D Prescribers`, `Opioid Claims`, main = "Part D Prescribers and Opioid Claims per State")
+detach(Poverty.ODeaths.Prescribers.13.14)
+```
+
+```{r fig.height = 6, fig.width = 10, fig.align = "center"}
+library(epade)
+D_columns <- c("Part D Prescribers 2013","Opioid Prescribing Rate 2013","Opioid Prescribing Rate 2013","Part D Prescribers 2014","Opioid Claims 2014","Overall Claims 2014", "Opioid Prescribing Rate 2014")
+# Small multiples, lines
+bland.altman.ade(as.numeric(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Part D Prescribers 2013`), as.numeric(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Part D Prescribers 2014`), xlab="Avg of two methods", ylab="Diff b/w two methods", fitline=0, main="Bland-Altman Plot: Part D Opioid Prescribers from 2013 to 2014")
+
+```
+```{r fig.height = 6, fig.width = 10, fig.align = "center"}
+bland.altman.ade(as.numeric(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Part D Prescribers 2013`), as.numeric(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Opioid Prescribing Rate 2013`), xlab="Avg of two methods", ylab="Diff b/w two methods", fitline=0,main="Bland-Altman Plot: Part D Opioid Prescriber and Prescribing Rate, 2013")
+```
+```{r  fig.height = 6, fig.width = 10, fig.align = "center"}
+bland.altman.ade(as.numeric(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Part D Prescribers 2014`), as.numeric(Part_D_Opioid_Prescribing_Change_Geographic_2013_2014$`Opioid Prescribing Rate 2014`), xlab="Avg of two methods", ylab="Diff b/w two methods", fitline=0,main="Bland-Altman Plot: Part D Opioid Prescriber and Prescribing Rate, 2014")
+```
+Do female or male doctors tend to prescribe more opioids?
+```{r}
+head(Poverty.ODeaths.Prescribers.13.14,3)
+```
+State Opioid Claims and Number of Deaths, colored by Year.
+```{r}
+ggplot(Poverty.ODeaths.Prescribers.13.14, aes(x=`Opioid Claims`)) + geom_histogram(aes(fill=as.character(Year)), col="white") + labs(title="Distribution of Opioid Claims colored by Year")
+```
+
+```{r  fig.height = 10, fig.width = 10, fig.align = "center"}
+ggplot(Opioid.PrescribersDF, aes(Specialty,Gender, col=Gender)) + geom_count() + labs(title="Specialty and Gender of US Opioid Prescribers") + coord_flip() + theme_bw()
+```
+```{r}
+df <- as.data.frame(multi.fun(prescriber_info$Specialty))
+df <- df[order(df$freq),]
+```
+
+```{r}
+
+ # same plot as above but reordering by median values
+  ggplot(data = Poverty.ODeaths.Prescribers.13.14, mapping = aes(x = as.character(Year), y = `Opioid Prescribing Rate`)) +
+    geom_boxplot(aes(fill=as.character(Year), alpha=0.2)) + geom_point(alpha=0.8, pch=21, size=2) + theme_bw() + scale_color_wsj("colors6","") + labs(title="Opioid Prescribing Rate per Year, Part D") + theme(legend.position="none")
+
+```
+```{r}
+Fentanyl_Prescribers <- Opioid.PrescribersDF[Opioid.PrescribersDF$FENTANYL !=0,]
+```
+```{r}
+head(Fentanyl_Prescribers)
+```
+```{r fig.height=10, fig.width=13}
+ggplot(Fentanyl_Prescribers, aes(reorder(State, FENTANYL), FENTANYL)) + geom_col(aes(fill=Specialty)) + coord_flip() + theme_fivethirtyeight() + labs(title="Fentanyl Prescriptions by State colored by Prescribers Specialty")
+```
+
+```{r}
+# not.include <- c("")
+# df_mat <- as.matrix(Opioid.PrescribersDF)
+# cors <- cor(df_mat[,6:13])
+# col<- colorRampPalette(c('blue', 'white', 'red'))(20)
+# heatmap(x = cors, col = col, symm = T)
+```
+
+
+
+Where the data is from:
+
+ http://wonder.cdc.gov/wonder
+
+Citation for Opioid Prescription Data: IMS Health, Vector One: National, years 1991-1996, Data Extracted 2011. IMS Health, National Prescription Audit, years 1997-2013, Data Extracted 2014. Accessed at NIDA article linked (Figure 1) on Oct 23, 2016.
+
+ Opioid Prescriptions Dispensed by US Retail Pharmacies 1991-2013
+
+This data includes the number of opioid prescriptions dispensed (millions) by US retail pharmacies from 1991-2013. The figures were taken from the diagram above in an article by Nora D. Volkow, M.D. on the National Institute of Drug Abuse.
+
+US retail pharmacies, Q42009-Q22015
+
+This data includes the number of opioid analgesic prescriptions dispensed by US retail pharmacies from Q4 2009 to Q2 2015. This dataset includes breakdowns by type of opioid analgesic. (Added 26 Oct 2016)
+
+
+Demographic Data comes from the Census using the query tool 'FactFinder' to search for datasets.
+
+
+
